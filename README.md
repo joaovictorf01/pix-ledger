@@ -19,3 +19,8 @@ O Spring sobe o Postgres do `compose.yaml` sozinho.
 ```
 
 Os testes usam Testcontainers, com um Postgres real.
+
+## Documentação da API
+
+- Swagger: `http://localhost:8080/swagger-ui.html`
+- Requisições prontas na pasta `http/`, para a extensão REST Client do VS Code (ambiente `local`) ou para o cliente HTTP do IntelliJ.

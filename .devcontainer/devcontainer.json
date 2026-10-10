@@ -1,14 +1,22 @@
 {
   "name": "pix-ledger",
-  "image": "mcr.microsoft.com/devcontainers/java:25",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
   "features": {
+    "ghcr.io/devcontainers/features/java:1": {
+      "version": "25",
+      "jdkDistro": "tem"
+    },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "forwardPorts": [8080],
   "postCreateCommand": "chmod +x mvnw && ./mvnw -q -DskipTests dependency:go-offline",
   "customizations": {
     "vscode": {
-      "extensions": ["vscjava.vscode-java-pack", "vmware.vscode-spring-boot"]
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "humao.rest-client"
+      ]
     }
   }
 }

@@ -1,0 +1,2 @@
+### Aplicação no ar
+GET {{baseUrl}}/actuator/health
