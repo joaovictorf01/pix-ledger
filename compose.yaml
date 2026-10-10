@@ -1,9 +1,20 @@
 services:
   postgres:
-    image: 'postgres:17'
+    image: 'postgres:17.11-alpine'
     environment:
-      - 'POSTGRES_DB=pixledger'
-      - 'POSTGRES_USER=pixledger'
-      - 'POSTGRES_PASSWORD=pixledger'
+      POSTGRES_DB: pixledger
+      POSTGRES_USER: pixledger
+      # Senha só de desenvolvimento local; nunca usar em produção.
+      POSTGRES_PASSWORD: pixledger
     ports:
       - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pixledger -d pixledger']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:
