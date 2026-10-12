@@ -1,0 +1,36 @@
+@baseUrl = http://localhost:8080
+
+# Amounts are in cents: 10000 = R$ 100,00
+
+### Open a customer account (copy the "id" from the response)
+POST {{baseUrl}}/customers
+Content-Type: application/json
+
+{
+  "code": "ana"
+}
+
+###
+@accountId = paste-the-account-id-here
+
+### Balance
+GET {{baseUrl}}/customers/{{accountId}}/balance
+
+### Current Pix limit and any pending increase
+GET {{baseUrl}}/customers/{{accountId}}/pix-limit
+
+### Decrease: applies immediately
+PUT {{baseUrl}}/customers/{{accountId}}/pix-limit
+Content-Type: application/json
+
+{
+  "dailyLimit": 100000
+}
+
+### Increase: status PENDING_INCREASE for 24 hours
+PUT {{baseUrl}}/customers/{{accountId}}/pix-limit
+Content-Type: application/json
+
+{
+  "dailyLimit": 1000000
+}

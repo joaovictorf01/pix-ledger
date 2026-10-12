@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import dev.joaovictor.pixledger.application.LedgerService;
 import dev.joaovictor.pixledger.application.account.SystemAccounts;
-import dev.joaovictor.pixledger.domain.AccountNotFoundException;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.domain.Ledger;
 import dev.joaovictor.pixledger.domain.LedgerTransaction;
 import dev.joaovictor.pixledger.domain.Posting;

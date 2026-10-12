@@ -4,8 +4,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.joaovictor.pixledger.domain.Account;
-import dev.joaovictor.pixledger.domain.AccountNotFoundException;
-import dev.joaovictor.pixledger.domain.InvalidTransactionException;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
+import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
 import dev.joaovictor.pixledger.domain.LedgerEntry;
 import dev.joaovictor.pixledger.domain.LedgerTransaction;
 import dev.joaovictor.pixledger.persistence.AccountRepository;

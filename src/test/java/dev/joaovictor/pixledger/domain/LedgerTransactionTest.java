@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
+
 class LedgerTransactionTest {
 
     private final UUID customerFunds = UUID.randomUUID();

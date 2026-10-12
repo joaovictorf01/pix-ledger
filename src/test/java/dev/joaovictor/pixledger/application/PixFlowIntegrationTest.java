@@ -21,11 +21,13 @@ import org.springframework.context.annotation.Import;
 import dev.joaovictor.pixledger.TestcontainersConfiguration;
 import dev.joaovictor.pixledger.application.account.OpenCustomerAccountUseCase;
 import dev.joaovictor.pixledger.application.account.SystemAccounts;
+import dev.joaovictor.pixledger.application.limit.ChangePixLimitUseCase;
 import dev.joaovictor.pixledger.application.pix.ReceivePixCommand;
 import dev.joaovictor.pixledger.application.pix.ReceivePixUseCase;
 import dev.joaovictor.pixledger.application.pix.SendPixCommand;
 import dev.joaovictor.pixledger.application.pix.SendPixUseCase;
-import dev.joaovictor.pixledger.domain.InsufficientFundsException;
+import dev.joaovictor.pixledger.domain.exception.InsufficientFundsException;
+import dev.joaovictor.pixledger.domain.exception.PixLimitExceededException;
 import dev.joaovictor.pixledger.domain.SystemAccount;
 import dev.joaovictor.pixledger.persistence.LedgerEntryRepository;
 
@@ -43,6 +45,8 @@ class PixFlowIntegrationTest {
     private LedgerEntryRepository entries;
     @Autowired
     private SystemAccounts systemAccounts;
+    @Autowired
+    private ChangePixLimitUseCase changePixLimit;
 
     @Test
     void receiveThenSendUpdatesBothLedgers() {
@@ -116,6 +120,31 @@ class PixFlowIntegrationTest {
         assertThat(rejected).isEqualTo(1);
         assertThat(entries.balanceOf(ana)).isEqualTo(20_00);
         assertInvariantHolds();
+    }
+
+    @Test
+    void rejectsPixAboveDailyLimitAndAppliesDecreaseAtOnce() {
+        UUID dani = openAccount.execute("dani-" + UUID.randomUUID()).getId();
+        receivePix.execute(new ReceivePixCommand(dani, 10_000_00, newEndToEndId()));
+
+        changePixLimit.execute(dani, 1_000_00);
+        sendPix.execute(new SendPixCommand(dani, 700_00, newEndToEndId()));
+
+        assertThatThrownBy(() -> sendPix.execute(new SendPixCommand(dani, 400_00, newEndToEndId())))
+                .isInstanceOf(PixLimitExceededException.class);
+        assertThat(entries.balanceOf(dani)).isEqualTo(9_300_00);
+        assertInvariantHolds();
+    }
+
+    @Test
+    void increaseDoesNotUnlockPixBeforeTwentyFourHours() {
+        UUID edu = openAccount.execute("edu-" + UUID.randomUUID()).getId();
+        receivePix.execute(new ReceivePixCommand(edu, 20_000_00, newEndToEndId()));
+
+        changePixLimit.execute(edu, 10_000_00);
+
+        assertThatThrownBy(() -> sendPix.execute(new SendPixCommand(edu, 6_000_00, newEndToEndId())))
+                .isInstanceOf(PixLimitExceededException.class);
     }
 
     /**

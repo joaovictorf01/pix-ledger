@@ -1,4 +1,4 @@
-package dev.joaovictor.pixledger.domain;
+package dev.joaovictor.pixledger.domain.exception;
 
 public class InvalidTransactionException extends RuntimeException {
 

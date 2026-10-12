@@ -1,0 +1,45 @@
+@baseUrl = http://localhost:8080
+@accountId = paste-the-account-id-here
+
+# Amounts are in cents: 10000 = R$ 100,00
+# Sending the same endToEndId again is a retry: nothing is recorded twice.
+
+### Receive R$ 100,00 from another institution
+POST {{baseUrl}}/pix/incoming
+Content-Type: application/json
+
+{
+  "customerAccountId": "{{accountId}}",
+  "amount": 10000,
+  "endToEndId": "E00000000202610121800incoming0001"
+}
+
+### Send R$ 30,00
+POST {{baseUrl}}/pix/transfers
+Content-Type: application/json
+
+{
+  "customerAccountId": "{{accountId}}",
+  "amount": 3000,
+  "endToEndId": "E00000000202610121805outgoing0001"
+}
+
+### Same request again: returns the same transaction, balance does not change
+POST {{baseUrl}}/pix/transfers
+Content-Type: application/json
+
+{
+  "customerAccountId": "{{accountId}}",
+  "amount": 3000,
+  "endToEndId": "E00000000202610121805outgoing0001"
+}
+
+### More than the balance: 422 Insufficient funds
+POST {{baseUrl}}/pix/transfers
+Content-Type: application/json
+
+{
+  "customerAccountId": "{{accountId}}",
+  "amount": 999999999,
+  "endToEndId": "E00000000202610121810outgoing0002"
+}

@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
-import dev.joaovictor.pixledger.domain.AccountNotFoundException;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.domain.SystemAccount;
 import dev.joaovictor.pixledger.persistence.AccountRepository;
 
