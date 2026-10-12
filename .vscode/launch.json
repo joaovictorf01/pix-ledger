@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "PixLedger (Docker Compose)",
+      "request": "launch",
+      "mainClass": "dev.joaovictor.pixledger.PixLedgerApplication",
+      "projectName": "pix-ledger"
+    },
+    {
+      "type": "java",
+      "name": "PixLedger (Testcontainers)",
+      "request": "launch",
+      "mainClass": "dev.joaovictor.pixledger.TestPixLedgerApplication",
+      "projectName": "pix-ledger"
+    }
+  ]
+}

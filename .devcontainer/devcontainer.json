@@ -21,7 +21,11 @@
         "vscjava.vscode-java-pack",
         "vmware.vscode-spring-boot",
         "humao.rest-client"
-      ]
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic",
+        "java.debug.settings.hotCodeReplace": "auto"
+      }
     }
   }
 }
