@@ -1,13 +1,15 @@
 package dev.joaovictor.pixledger.application;
 
+import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import dev.joaovictor.pixledger.domain.Account;
-import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
-import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
 import dev.joaovictor.pixledger.domain.LedgerEntry;
 import dev.joaovictor.pixledger.domain.LedgerTransaction;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
+import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
 import dev.joaovictor.pixledger.persistence.AccountRepository;
 import dev.joaovictor.pixledger.persistence.LedgerTransactionRepository;
 import jakarta.persistence.EntityManager;
@@ -28,6 +30,11 @@ public class LedgerService {
         this.transactions = transactions;
         this.accounts = accounts;
         this.entityManager = entityManager;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LedgerTransaction> findByIdempotencyKey(String idempotencyKey) {
+        return transactions.findByIdempotencyKey(idempotencyKey);
     }
 
     /**

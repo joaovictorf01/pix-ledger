@@ -15,7 +15,7 @@ class PixLimitTest {
     private final PixLimit limit = new PixLimit(UUID.randomUUID(), 1_000_00, start);
 
     @Test
-    void decreaseAppliesImmediately() {
+    void shouldApplyDecreaseImmediately() {
         limit.requestChange(500_00, start);
 
         assertThat(limit.currentLimit(start)).isEqualTo(500_00);
@@ -23,7 +23,7 @@ class PixLimitTest {
     }
 
     @Test
-    void increaseWaitsTwentyFourHours() {
+    void shouldApplyIncreaseOnlyAfterTwentyFourHours() {
         limit.requestChange(5_000_00, start);
 
         Instant almost = start.plus(Duration.ofHours(24)).minusSeconds(1);
@@ -37,7 +37,7 @@ class PixLimitTest {
     }
 
     @Test
-    void decreaseCancelsPendingIncrease() {
+    void shouldCancelPendingIncreaseWhenDecreased() {
         limit.requestChange(5_000_00, start);
         limit.requestChange(500_00, start.plus(Duration.ofHours(2)));
 
@@ -47,7 +47,7 @@ class PixLimitTest {
     }
 
     @Test
-    void newIncreaseReplacesPendingOneAndRestartsTheWait() {
+    void shouldReplacePendingIncreaseAndRestartTheWait() {
         limit.requestChange(3_000_00, start);
         Instant later = start.plus(Duration.ofHours(10));
         limit.requestChange(5_000_00, later);
@@ -57,7 +57,7 @@ class PixLimitTest {
     }
 
     @Test
-    void maturedIncreaseIsTheBaseForTheNextRequest() {
+    void shouldUseMaturedIncreaseAsBaseForNextRequest() {
         limit.requestChange(5_000_00, start);
         Instant afterIncrease = start.plus(Duration.ofHours(25));
 
@@ -68,7 +68,7 @@ class PixLimitTest {
     }
 
     @Test
-    void rejectsZeroOrNegativeLimit() {
+    void shouldRejectZeroOrNegativeLimit() {
         assertThatThrownBy(() -> limit.requestChange(0, start)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> limit.requestChange(-1, start)).isInstanceOf(IllegalArgumentException.class);
     }

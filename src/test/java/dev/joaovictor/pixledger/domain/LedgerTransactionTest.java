@@ -16,7 +16,7 @@ class LedgerTransactionTest {
     private final UUID instantPayments = UUID.randomUUID();
 
     @Test
-    void createsBalancedTransactionWithOneEntryPerPosting() {
+    void shouldCreateOneEntryPerPostingWhenBalanced() {
         LedgerTransaction transaction = LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
                 new Posting(instantPayments, 50)));
@@ -31,7 +31,7 @@ class LedgerTransactionTest {
     }
 
     @Test
-    void rejectsSinglePosting() {
+    void shouldRejectSinglePosting() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(instantPayments, 50))))
                 .isInstanceOf(InvalidTransactionException.class)
@@ -39,7 +39,7 @@ class LedgerTransactionTest {
     }
 
     @Test
-    void rejectsPostingsThatDoNotAddUpToZero() {
+    void shouldRejectPostingsThatDoNotAddUpToZero() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
                 new Posting(instantPayments, 40))))
@@ -48,7 +48,7 @@ class LedgerTransactionTest {
     }
 
     @Test
-    void rejectsBlankIdempotencyKey() {
+    void shouldRejectBlankIdempotencyKey() {
         assertThatThrownBy(() -> LedgerTransaction.create(" ", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
                 new Posting(instantPayments, 50))))
@@ -56,7 +56,7 @@ class LedgerTransactionTest {
     }
 
     @Test
-    void rejectsZeroAmountPosting() {
+    void shouldRejectZeroAmountPosting() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, 0),
                 new Posting(instantPayments, 0))))
@@ -64,7 +64,7 @@ class LedgerTransactionTest {
     }
 
     @Test
-    void rejectsSumThatOverflows() {
+    void shouldRejectSumThatOverflows() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, Long.MAX_VALUE),
                 new Posting(instantPayments, 1),

@@ -9,27 +9,24 @@ import org.springframework.transaction.annotation.Transactional;
 
 import dev.joaovictor.pixledger.application.LedgerService;
 import dev.joaovictor.pixledger.application.account.SystemAccounts;
-import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.domain.Ledger;
 import dev.joaovictor.pixledger.domain.LedgerTransaction;
 import dev.joaovictor.pixledger.domain.Posting;
 import dev.joaovictor.pixledger.domain.SystemAccount;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.persistence.AccountRepository;
-import dev.joaovictor.pixledger.persistence.LedgerTransactionRepository;
 
 @Service
 public class ReceivePixUseCase {
 
     private final AccountRepository accounts;
-    private final LedgerTransactionRepository transactions;
     private final LedgerService ledger;
     private final SystemAccounts systemAccounts;
     private final ApplicationEventPublisher events;
 
-    public ReceivePixUseCase(AccountRepository accounts, LedgerTransactionRepository transactions,
-            LedgerService ledger, SystemAccounts systemAccounts, ApplicationEventPublisher events) {
+    public ReceivePixUseCase(AccountRepository accounts, LedgerService ledger, SystemAccounts systemAccounts,
+            ApplicationEventPublisher events) {
         this.accounts = accounts;
-        this.transactions = transactions;
         this.ledger = ledger;
         this.systemAccounts = systemAccounts;
         this.events = events;
@@ -42,8 +39,8 @@ public class ReceivePixUseCase {
         accounts.findByIdForUpdate(command.customerAccountId())
                 .orElseThrow(() -> new AccountNotFoundException(command.customerAccountId().toString()));
 
-        String idempotencyKey = "pix:" + command.endToEndId() + ":" + Ledger.CUSTOMER;
-        var existing = transactions.findByIdempotencyKey(idempotencyKey);
+        String idempotencyKey = PixIdempotencyKey.of(command.endToEndId(), Ledger.CUSTOMER);
+        var existing = ledger.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
             return existing.get().getId();
         }

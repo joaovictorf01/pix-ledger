@@ -14,11 +14,17 @@ Spring starts the Postgres service from `compose.yaml` automatically.
 
 ## Tests
 
+Unit tests (`*Test`) need only Java and run in a few seconds:
+
 ```bash
 ./mvnw test
 ```
 
-Tests use Testcontainers with a real Postgres instance.
+Integration tests (`*IT`) run against a real Postgres started by Testcontainers, so they need Docker. This runs both:
+
+```bash
+./mvnw verify
+```
 
 ## API documentation
 

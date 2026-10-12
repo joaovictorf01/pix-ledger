@@ -43,7 +43,7 @@ public class InternalLedgerSync {
             case INCOMING -> event.amount();
         };
 
-        String idempotencyKey = "pix:" + event.endToEndId() + ":" + Ledger.INTERNAL;
+        String idempotencyKey = PixIdempotencyKey.of(event.endToEndId(), Ledger.INTERNAL);
         ledger.record(LedgerTransaction.create(idempotencyKey, Ledger.INTERNAL, List.of(
                 new Posting(systemAccounts.idOf(SystemAccount.INSTANT_PAYMENTS), instantPaymentsChange),
                 new Posting(systemAccounts.idOf(SystemAccount.INTERNAL_WORLD), -instantPaymentsChange))));

@@ -7,8 +7,8 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.domain.PixLimit;
+import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.persistence.AccountRepository;
 import dev.joaovictor.pixledger.persistence.PixLimitRepository;
 
