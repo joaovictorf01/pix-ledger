@@ -1,26 +1,26 @@
 # pix-ledger
 
-Ledger de Pix em partidas dobradas, feito para o mini desafio técnico da Cumbuca.
+Double-entry ledger for Pix payments, built for the Cumbuca technical challenge.
 
-## Como rodar
+## Running
 
-Requer Docker. No Codespace, o Docker já vem configurado.
+Requires Docker. In the Codespace, Docker is already set up.
 
 ```bash
 ./mvnw spring-boot:run
 ```
 
-O Spring sobe o Postgres do `compose.yaml` sozinho.
+Spring starts the Postgres service from `compose.yaml` automatically.
 
-## Testes
+## Tests
 
 ```bash
 ./mvnw test
 ```
 
-Os testes usam Testcontainers, com um Postgres real.
+Tests use Testcontainers with a real Postgres instance.
 
-## Documentação da API
+## API documentation
 
-- Swagger: `http://localhost:8080/swagger-ui.html`
-- Requisições prontas na pasta `http/`, para a extensão REST Client do VS Code (ambiente `local`) ou para o cliente HTTP do IntelliJ.
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Ready-to-run requests in the `http/` folder, for the VS Code REST Client extension or the IntelliJ HTTP client.
