@@ -128,3 +128,7 @@ Há testes das regras sem banco e testes com banco real. Os principais: dois Pix
 - Fins de semana e feriados. Assumi que o dinheiro de Recursos de Clientes volta todo dia às 8h, mas em fim de semana e feriado ele provavelmente não volta, e a Reserva teria que cobrir de sexta às 18h até segunda às 8h.
 - Os endpoints internos estão abertos. Em produção, só o time interno poderia chamar, por exemplo, o fechamento do dia.
 - O `/internal/invariants` mostra quando algo não bate, mas só para quem olha. Em produção, ele avisaria a equipe sozinho.
+
+## Sobre o uso de IA
+
+Usei IA (Claude) como apoio para escrever parte do código e para revisar. As regras de negócio e as decisões de design foram minhas, e testei cada uma delas.
