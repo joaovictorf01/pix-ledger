@@ -12,6 +12,33 @@ O requisito das 18h só faz sentido se, depois desse horário, o dinheiro de Rec
 
 "O valor que um cliente possa legitimamente querer transacionar" foi interpretado como o menor entre o saldo do cliente e o que ainda resta do seu limite diário de Pix. Segui a regra do Banco Central para limites: redução vale na hora; aumento só vale depois de 24 horas, para proteger o cliente que é forçado a aumentar o limite durante um golpe. Uma redução feita enquanto um aumento está pendente cancela o aumento.
 
+## Contas e movimentos
+
+O diagrama mostra as contas de cada livro e por onde o dinheiro passa. O Pix movimenta os dois livros ao mesmo tempo; Recursos de Clientes e a Reserva só se movem por operações internas.
+
+```mermaid
+flowchart LR
+    subgraph clientes[Livro de clientes]
+        C[Saldos dos clientes]
+        WC[WORLD]
+    end
+    subgraph interno[Livro interno]
+        IP[Pagamentos Instantâneos]
+        CF[Recursos de Clientes]
+        R[Reserva Financeira]
+        WI[WORLD]
+    end
+    C -- Pix enviado --> WC
+    WC -- Pix recebido --> C
+    IP -- Pix enviado --> WI
+    WI -- Pix recebido --> IP
+    CF -- reabastecimento, 8h às 18h --> IP
+    IP -- excedente e fechamento das 18h --> CF
+    R -- adiantamento, 18h às 8h --> IP
+    IP -- devolução do adiantamento --> R
+    CF -- devolução às 8h --> R
+```
+
 ## Modelo contábil
 
 Cada movimentação é uma transação com pelo menos duas linhas (lançamentos), todas no mesmo livro, cuja soma é zero. A transação é validada antes de existir: se as linhas não somam zero, se misturam livros ou se uma conta não pertence ao livro, ela não é criada. Os lançamentos nunca são alterados nem apagados; uma correção é um novo lançamento.
@@ -31,6 +58,23 @@ Durante o dia o adiantamento é zero, e a igualdade é exatamente a do enunciado
 Envio. A conta do cliente é travada no banco (`SELECT ... FOR UPDATE`). Com a trava, verifica-se se o EndToEndId já foi gravado; depois o saldo; depois o limite do dia. Só então a transação do livro de clientes é gravada: cliente menos o valor, `WORLD` mais o valor. A leitura do saldo acontece dentro da trava, porque é isso que impede dois Pix simultâneos de gastarem o mesmo dinheiro. A trava é por conta: Pix de contas diferentes correm em paralelo.
 
 Depois que essa transação é confirmada, um evento atualiza o livro interno, em outra transação: Pagamentos Instantâneos menos o valor, `WORLD` mais o valor. Essa é a consistência eventual pedida: o saldo do cliente muda na hora, e as contas internas acompanham logo em seguida.
+
+```mermaid
+sequenceDiagram
+    participant Cliente
+    participant API as POST /pix/transfers
+    participant Banco as PostgreSQL
+    participant Interno as Atualização do livro interno
+    Cliente->>API: conta, valor e EndToEndId
+    API->>Banco: trava a conta do cliente
+    API->>Banco: EndToEndId já gravado?
+    API->>Banco: confere saldo e limite do dia
+    API->>Banco: grava cliente menos valor, WORLD mais valor
+    Banco-->>API: confirmado
+    API->>Interno: evento depois da confirmação
+    Interno->>Banco: grava Pagamentos Instantâneos menos valor, WORLD mais valor
+    API-->>Cliente: 201
+```
 
 Recebimento. Simétrico, sem verificação de saldo. Pix de outras instituições chegariam por uma fila de eventos; no código, um endpoint faz esse papel e chama o mesmo caso de uso que o consumidor da fila chamaria.
 
@@ -82,7 +126,7 @@ Há testes unitários, que rodam só com Java, e testes de integração com Post
 
 ## O que ficou fora e como evoluiria
 
-Fila de eventos. Hoje a atualização do livro interno é um evento dentro da aplicação, disparado depois da confirmação. Se a aplicação parar entre as duas transações, o lado interno fica faltando até ser reprocessado; o painel de invariantes mostra essa diferença. Em produção, usaria o padrão outbox: o evento é gravado na mesma transação do lado do cliente e publicado depois em uma fila (Kafka, por exemplo), com consumidor idempotente pela mesma chave. O recebimento de Pix de outras instituições usaria a mesma fila, chamando o caso de uso que já existe.
+Fila de eventos. Hoje a atualização do livro interno é um evento dentro da aplicação, disparado depois da confirmação. Se a aplicação parar entre as duas transações, o lado interno fica faltando até ser reprocessado; o painel de invariantes mostra essa diferença. Em produção, usaria o padrão outbox: o evento é gravado na mesma transação do lado do cliente e publicado depois em uma fila, com consumidor idempotente pela mesma chave. O recebimento de Pix de outras instituições usaria a mesma fila, chamando o caso de uso que já existe.
 
 Limite noturno. O Banco Central define um limite próprio entre 20h e 6h. Ele reduziria o alvo noturno e, com isso, o quanto a Reserva precisa adiantar.
 
