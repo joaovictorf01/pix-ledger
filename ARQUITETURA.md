@@ -124,5 +124,7 @@ Há testes das regras sem banco e testes com banco real. Os principais: dois Pix
 
 - Hoje a atualização do livro interno acontece dentro da aplicação. Se ela cair entre um passo e outro, o livro interno fica faltando até ser refeito (o `/internal/invariants` mostra a diferença). Em produção, eu gravaria o evento junto com a operação do cliente e publicaria numa fila depois (padrão outbox).
 - Limite noturno do Pix (20h às 6h), que diminuiria o quanto a Reserva precisa emprestar.
-- Toda operação na conta de Pagamentos Instantâneos passa pela mesma trava. Com muito volume isso vira gargalo, e seria preciso dividir a conta.
-- Fins de semana e feriados, autenticação dos endpoints internos e alertas automáticos.
+- Todo Pix, de qualquer cliente, passa pela conta de Pagamentos Instantâneos, e ela é travada a cada atualização do livro interno. É como uma loja com um caixa só: com muito volume, forma fila. A saída seria dividir essa conta em várias (por exemplo, dez), cada Pix usando uma delas, com o saldo total sendo a soma de todas.
+- Fins de semana e feriados. Assumi que o dinheiro de Recursos de Clientes volta todo dia às 8h, mas em fim de semana e feriado ele provavelmente não volta, e a Reserva teria que cobrir de sexta às 18h até segunda às 8h.
+- Os endpoints internos estão abertos. Em produção, só o time interno poderia chamar, por exemplo, o fechamento do dia.
+- O `/internal/invariants` mostra quando algo não bate, mas só para quem olha. Em produção, ele avisaria a equipe sozinho.
