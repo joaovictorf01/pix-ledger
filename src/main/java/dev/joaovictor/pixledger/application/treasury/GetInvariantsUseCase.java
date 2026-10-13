@@ -17,12 +17,10 @@ import dev.joaovictor.pixledger.domain.Ledger;
 public class GetInvariantsUseCase {
 
     private final Treasury treasury;
-    private final TreasuryProperties properties;
     private final Clock clock;
 
-    public GetInvariantsUseCase(Treasury treasury, TreasuryProperties properties, Clock clock) {
+    public GetInvariantsUseCase(Treasury treasury, Clock clock) {
         this.treasury = treasury;
-        this.properties = properties;
         this.clock = clock;
     }
 
@@ -51,7 +49,7 @@ public class GetInvariantsUseCase {
                                 + position.customerMoneyDifference()
                                 + "; a short non-zero value means a Pix is still reaching the internal ledger"),
                 new Check("instant-payments-covers-target",
-                        position.instantPayments() >= position.instantPaymentsTarget() - properties.tolerance(),
+                        position.instantPayments() >= position.instantPaymentsTarget(),
                         "instant payments has " + position.instantPayments() + ", target is "
                                 + position.instantPaymentsTarget()),
                 new Check("reserve-advance-not-negative", position.reserveAdvance() >= 0,

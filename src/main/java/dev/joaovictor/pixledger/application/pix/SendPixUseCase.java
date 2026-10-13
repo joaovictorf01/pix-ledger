@@ -50,11 +50,13 @@ public class SendPixUseCase {
         accounts.findByIdForUpdate(command.customerAccountId())
                 .orElseThrow(() -> new AccountNotFoundException(command.customerAccountId().toString()));
 
-        // 2. Same endToEndId already recorded: it is a retry, return it as is.
+        // 2. Same endToEndId already recorded: a retry of the same Pix returns it;
+        //    the same id with different data is refused.
         String idempotencyKey = PixIdempotencyKey.of(command.endToEndId(), Ledger.CUSTOMER);
         var existing = ledger.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
-            return existing.get().getId();
+            return PixRetry.requireSame(existing.get(), entries, command.customerAccountId(), -command.amount(),
+                    command.endToEndId());
         }
 
         // 3. Only now, holding the lock, the balance and the daily limit are read.

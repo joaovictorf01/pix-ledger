@@ -16,19 +16,22 @@ import dev.joaovictor.pixledger.domain.Posting;
 import dev.joaovictor.pixledger.domain.SystemAccount;
 import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
 import dev.joaovictor.pixledger.persistence.AccountRepository;
+import dev.joaovictor.pixledger.persistence.LedgerEntryRepository;
 
 @Service
 public class ReceivePixUseCase {
 
     private final AccountRepository accounts;
+    private final LedgerEntryRepository entries;
     private final LedgerService ledger;
     private final SystemAccounts systemAccounts;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    public ReceivePixUseCase(AccountRepository accounts, LedgerService ledger, SystemAccounts systemAccounts,
-            ApplicationEventPublisher events, Clock clock) {
+    public ReceivePixUseCase(AccountRepository accounts, LedgerEntryRepository entries, LedgerService ledger,
+            SystemAccounts systemAccounts, ApplicationEventPublisher events, Clock clock) {
         this.accounts = accounts;
+        this.entries = entries;
         this.ledger = ledger;
         this.systemAccounts = systemAccounts;
         this.events = events;
@@ -45,7 +48,8 @@ public class ReceivePixUseCase {
         String idempotencyKey = PixIdempotencyKey.of(command.endToEndId(), Ledger.CUSTOMER);
         var existing = ledger.findByIdempotencyKey(idempotencyKey);
         if (existing.isPresent()) {
-            return existing.get().getId();
+            return PixRetry.requireSame(existing.get(), entries, command.customerAccountId(), command.amount(),
+                    command.endToEndId());
         }
 
         // Money comes from the world into the customer. No balance check:

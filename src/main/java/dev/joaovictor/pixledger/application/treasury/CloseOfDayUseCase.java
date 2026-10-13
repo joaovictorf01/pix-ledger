@@ -7,6 +7,7 @@ import static dev.joaovictor.pixledger.domain.SystemAccount.INSTANT_PAYMENTS;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import dev.joaovictor.pixledger.domain.BusinessTime;
 import dev.joaovictor.pixledger.domain.Closing;
+import dev.joaovictor.pixledger.domain.exception.ClosingNotDueException;
 import dev.joaovictor.pixledger.persistence.ClosingRepository;
 
 /**
@@ -28,13 +30,15 @@ public class CloseOfDayUseCase {
     private final Treasury treasury;
     private final RebalanceInstantPaymentsUseCase rebalance;
     private final ClosingRepository closings;
+    private final TreasuryProperties properties;
     private final Clock clock;
 
     public CloseOfDayUseCase(Treasury treasury, RebalanceInstantPaymentsUseCase rebalance,
-            ClosingRepository closings, Clock clock) {
+            ClosingRepository closings, TreasuryProperties properties, Clock clock) {
         this.treasury = treasury;
         this.rebalance = rebalance;
         this.closings = closings;
+        this.properties = properties;
         this.clock = clock;
     }
 
@@ -55,7 +59,13 @@ public class CloseOfDayUseCase {
     public ClosingReport execute() {
         treasury.lock();
         Instant now = clock.instant();
-        LocalDate businessDay = now.atZone(BusinessTime.ZONE).toLocalDate();
+        ZonedDateTime brasilia = now.atZone(BusinessTime.ZONE);
+        LocalDate businessDay = brasilia.toLocalDate();
+
+        // An early call must not take the day's only closing.
+        if (brasilia.toLocalTime().isBefore(properties.closingTime())) {
+            throw new ClosingNotDueException(businessDay, properties.closingTime());
+        }
 
         var existing = closings.findById(businessDay);
         if (existing.isPresent()) {

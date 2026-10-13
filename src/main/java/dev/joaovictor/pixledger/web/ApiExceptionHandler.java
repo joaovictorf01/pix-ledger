@@ -6,6 +6,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import dev.joaovictor.pixledger.domain.exception.AccountNotFoundException;
+import dev.joaovictor.pixledger.domain.exception.ClosingNotDueException;
+import dev.joaovictor.pixledger.domain.exception.IdempotencyConflictException;
 import dev.joaovictor.pixledger.domain.exception.InsufficientFundsException;
 import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
 import dev.joaovictor.pixledger.domain.exception.PixLimitExceededException;
@@ -27,6 +29,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(PixLimitExceededException.class)
     ProblemDetail limitExceeded(PixLimitExceededException e) {
         return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Pix limit exceeded", e);
+    }
+
+    @ExceptionHandler(IdempotencyConflictException.class)
+    ProblemDetail idempotencyConflict(IdempotencyConflictException e) {
+        return problem(HttpStatus.CONFLICT, "endToEndId already used", e);
+    }
+
+    @ExceptionHandler(ClosingNotDueException.class)
+    ProblemDetail closingNotDue(ClosingNotDueException e) {
+        return problem(HttpStatus.CONFLICT, "Closing not due yet", e);
     }
 
     @ExceptionHandler({ InvalidTransactionException.class, IllegalArgumentException.class })

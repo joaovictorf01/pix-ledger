@@ -1,6 +1,7 @@
 package dev.joaovictor.pixledger.application.treasury;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -12,6 +13,7 @@ import dev.joaovictor.pixledger.application.IntegrationTestSupport;
 import dev.joaovictor.pixledger.application.pix.SendPixCommand;
 import dev.joaovictor.pixledger.application.pix.SendPixUseCase;
 import dev.joaovictor.pixledger.application.treasury.CloseOfDayUseCase.ClosingReport;
+import dev.joaovictor.pixledger.domain.exception.ClosingNotDueException;
 
 class TreasuryIT extends IntegrationTestSupport {
 
@@ -80,9 +82,22 @@ class TreasuryIT extends IntegrationTestSupport {
         assertThat(invariants.execute().status()).isEqualTo("OK");
     }
 
+    @Test
+    void shouldRefuseToCloseTheDayBeforeClosingTime() {
+        // given: 15h in Brasília, three hours before the closing
+        clock.setTo(Instant.parse("2026-10-22T18:00:00Z"));
+
+        // when / then: refused, and the day can still be closed at 18h
+        assertThatThrownBy(() -> closeOfDay.execute()).isInstanceOf(ClosingNotDueException.class);
+        clock.setTo(Instant.parse("2026-10-22T21:00:00Z"));
+        assertThat(closeOfDay.execute().alreadyClosed()).isFalse();
+    }
+
+    /** Never below the target; above it by at most the tolerance. */
     private void assertInstantPaymentsAtTarget() {
         TreasuryPosition position = treasury.position(clock.instant());
-        assertThat(Math.abs(position.instantPaymentsTarget() - position.instantPayments()))
+        assertThat(position.instantPayments()).isGreaterThanOrEqualTo(position.instantPaymentsTarget());
+        assertThat(position.instantPayments() - position.instantPaymentsTarget())
                 .isLessThanOrEqualTo(properties.tolerance());
     }
 }

@@ -16,8 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import dev.joaovictor.pixledger.domain.SystemAccount;
 
 /**
- * Keeps Instant Payments close to its target: the most customers could
- * legitimately send right now.
+ * Keeps Instant Payments at or above its target: the most customers could
+ * legitimately send right now. A shortfall is always covered; the tolerance
+ * only avoids giving back small surpluses.
  *
  * During the day it uses Customer Funds, and first pays back anything the
  * Reserve lent overnight. After the closing, Customer Funds are in custody,
@@ -58,15 +59,15 @@ public class RebalanceInstantPaymentsUseCase {
             move(CUSTOMER_FUNDS, FINANCIAL_RESERVE, repay, run + "repay", now, movements);
             long customerFundsLeft = position.customerFunds() - repay;
 
-            // 2. Top up or give back, if the gap is beyond the tolerance.
-            if (gap > properties.tolerance()) {
+            // 2. Any shortfall is topped up; a surplus goes back only beyond the tolerance.
+            if (gap > 0) {
                 move(CUSTOMER_FUNDS, INSTANT_PAYMENTS, Math.min(gap, customerFundsLeft), run + "top-up", now,
                         movements);
             } else if (gap < -properties.tolerance()) {
                 move(INSTANT_PAYMENTS, CUSTOMER_FUNDS, -gap, run + "give-back", now, movements);
             }
         } else {
-            if (gap > properties.tolerance()) {
+            if (gap > 0) {
                 // The Reserve lends: the advance is what the Reserve is missing from its capital.
                 move(FINANCIAL_RESERVE, INSTANT_PAYMENTS, Math.min(gap, position.financialReserve()),
                         run + "advance", now, movements);

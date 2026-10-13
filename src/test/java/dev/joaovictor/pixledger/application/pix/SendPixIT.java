@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import dev.joaovictor.pixledger.application.IntegrationTestSupport;
 import dev.joaovictor.pixledger.domain.SystemAccount;
+import dev.joaovictor.pixledger.domain.exception.IdempotencyConflictException;
 import dev.joaovictor.pixledger.domain.exception.InsufficientFundsException;
 
 class SendPixIT extends IntegrationTestSupport {
@@ -66,6 +67,19 @@ class SendPixIT extends IntegrationTestSupport {
         assertThat(retry).isEqualTo(first);
         assertThat(balanceOf(caio)).isEqualTo(70_00);
         assertInvariantHolds();
+    }
+
+    @Test
+    void shouldRefuseSameEndToEndIdWithDifferentAmount() {
+        // given
+        UUID caio = newCustomerWithBalance(100_00);
+        String endToEndId = newEndToEndId();
+        sendPix.execute(new SendPixCommand(caio, 30_00, endToEndId));
+
+        // when / then: the id is taken by another payment, nothing changes
+        assertThatThrownBy(() -> sendPix.execute(new SendPixCommand(caio, 50_00, endToEndId)))
+                .isInstanceOf(IdempotencyConflictException.class);
+        assertThat(balanceOf(caio)).isEqualTo(70_00);
     }
 
     @Test
