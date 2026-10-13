@@ -1,20 +1,14 @@
-# Ledger de Pix: proposta de arquitetura
+# Desafio Cumbuca: ledger de Pix
 
-Este documento responde ao mini desafio técnico da Cumbuca. Além da proposta, implementei o núcleo dela para comprovar que a política funciona. O código está em https://github.com/joaovictorf01/pix-ledger e as instruções para rodar estão no README.
+Além de escrever a proposta, fiz uma versão em código para testar se a ideia funciona: https://github.com/joaovictorf01/pix-ledger. O README explica como rodar.
 
-Todos os valores estão em centavos.
+## Como eu entendi o problema
 
-## Premissas
+São dois jeitos de olhar o mesmo dinheiro. O livro de clientes diz de quem é o dinheiro: quanto cada cliente tem. O livro interno diz onde ele está: em Recursos de Clientes, na conta de Pagamentos Instantâneos ou, no caso do dinheiro da própria instituição, na Reserva Financeira.
 
-O enunciado fala em três livros-razão e descreve dois. Considerei que o terceiro é a contrapartida externa: o dinheiro que entra no sistema vindo de outras instituições, ou que sai para elas. Sem ele, um Pix enviado aparece como saída do cliente e da conta de pagamentos instantâneos sem entrada em lugar nenhum, e a partida dobrada não fecha. No modelo, cada livro tem uma conta `WORLD` que representa esse lado de fora, e cada livro soma zero sozinho.
+O enunciado fala em três livros e descreve dois. Eu tratei o terceiro como o lado de fora: as outras instituições. Quando um cliente manda um Pix, o dinheiro sai do cliente e vai para fora. Sem uma conta representando esse "fora", a saída não teria para onde ir e a partida dobrada não fecharia. Por isso cada livro tem uma conta `WORLD`.
 
-O requisito das 18h só faz sentido se, depois desse horário, o dinheiro de Recursos de Clientes deixar de estar disponível. Se ele continuasse disponível, bastaria movê-lo de volta para a conta de pagamentos instantâneos logo depois do fechamento, e a regra não teria efeito. Assumi que às 18h os recursos dos clientes vão para custódia (por exemplo, aplicação em títulos públicos ou conta no Banco Central, como se espera de uma instituição de pagamento) e voltam a ficar disponíveis às 8h do dia seguinte. Os dois horários são configuráveis. É durante essa janela que a Reserva Financeira entra.
-
-"O valor que um cliente possa legitimamente querer transacionar" foi interpretado como o menor entre o saldo do cliente e o que ainda resta do seu limite diário de Pix. Segui a regra do Banco Central para limites: redução vale na hora; aumento só vale depois de 24 horas, para proteger o cliente que é forçado a aumentar o limite durante um golpe. Uma redução feita enquanto um aumento está pendente cancela o aumento.
-
-## Contas e movimentos
-
-O diagrama mostra as contas de cada livro e por onde o dinheiro passa. O Pix movimenta os dois livros ao mesmo tempo; Recursos de Clientes e a Reserva só se movem por operações internas.
+A regra principal é: o total dos saldos dos clientes tem que ser igual a Recursos de Clientes mais Pagamentos Instantâneos. Se não for, dinheiro foi criado ou sumiu.
 
 ```mermaid
 flowchart LR
@@ -33,103 +27,102 @@ flowchart LR
     IP -- Pix enviado --> WI
     WI -- Pix recebido --> IP
     CF -- reabastecimento, 8h às 18h --> IP
-    IP -- excedente e fechamento das 18h --> CF
-    R -- adiantamento, 18h às 8h --> IP
-    IP -- devolução do adiantamento --> R
+    IP -- sobra e fechamento das 18h --> CF
+    R -- empréstimo, 18h às 8h --> IP
+    IP -- devolução do empréstimo --> R
     CF -- devolução às 8h --> R
 ```
 
-## Modelo contábil
+## Partida dobrada
 
-Cada movimentação é uma transação com pelo menos duas linhas (lançamentos), todas no mesmo livro, cuja soma é zero. A transação é validada antes de existir: se as linhas não somam zero, se misturam livros ou se uma conta não pertence ao livro, ela não é criada. Os lançamentos nunca são alterados nem apagados; uma correção é um novo lançamento.
+Toda operação tem pelo menos duas linhas, uma tirando e outra colocando, e as linhas somam zero. Uma operação nunca mistura os dois livros. Se a soma não der zero, a operação nem é criada.
 
-Nenhuma conta guarda saldo. O saldo de uma conta é a soma dos seus lançamentos, o que impede que saldo e histórico divirjam.
+Nenhuma linha é alterada depois de gravada. Se algo estiver errado, entra uma linha nova corrigindo.
 
-Cada transação tem uma chave de idempotência única no banco. Para Pix, a chave vem do EndToEndId, então reenviar o mesmo Pix ou receber o mesmo evento duas vezes devolve a transação já gravada, sem mover dinheiro de novo.
+O saldo de uma conta não fica guardado em lugar nenhum: é a soma das linhas dela.
 
-O invariante do enunciado é mantido com um termo a mais:
+## Enviando um Pix
 
-    total dos saldos dos clientes = Recursos de Clientes + Pagamentos Instantâneos - adiantamento da Reserva
+1. Travo a conta do cliente no banco. Se chegar outro Pix da mesma conta ao mesmo tempo, ele espera. Pix de outras contas não esperam.
+2. Vejo se esse Pix já foi gravado, pelo EndToEndId. Se já foi, é uma repetição e devolvo o que já existe.
+3. Confiro o saldo e o limite do dia. Isso tem que acontecer depois da trava: se dois Pix lessem o saldo ao mesmo tempo, os dois veriam o mesmo valor e os dois passariam.
+4. Gravo no livro de clientes: cliente menos o valor, `WORLD` mais o valor.
+5. Depois que isso é confirmado, atualizo o livro interno: Pagamentos Instantâneos menos o valor, `WORLD` mais o valor.
 
-Durante o dia o adiantamento é zero, e a igualdade é exatamente a do enunciado. À noite, o dinheiro que a Reserva coloca em Pagamentos Instantâneos é da instituição, não dos clientes, e precisa ser descontado. O adiantamento não é anotado em lugar separado: ele é o capital da Reserva menos o saldo atual dela.
+O passo 5 é a consistência eventual: o saldo do cliente muda na hora, e o livro interno acompanha logo depois.
 
-## Fluxo de um Pix
-
-Envio. A conta do cliente é travada no banco (`SELECT ... FOR UPDATE`). Com a trava, verifica-se se o EndToEndId já foi gravado; depois o saldo; depois o limite do dia. Só então a transação do livro de clientes é gravada: cliente menos o valor, `WORLD` mais o valor. A leitura do saldo acontece dentro da trava, porque é isso que impede dois Pix simultâneos de gastarem o mesmo dinheiro. A trava é por conta: Pix de contas diferentes correm em paralelo.
-
-Depois que essa transação é confirmada, um evento atualiza o livro interno, em outra transação: Pagamentos Instantâneos menos o valor, `WORLD` mais o valor. Essa é a consistência eventual pedida: o saldo do cliente muda na hora, e as contas internas acompanham logo em seguida.
+Receber um Pix é o mesmo caminho ao contrário, sem conferir saldo. No enunciado esses Pix chegam por uma fila; no código, um endpoint faz esse papel.
 
 ```mermaid
 sequenceDiagram
     participant Cliente
     participant API as POST /pix/transfers
     participant Banco as PostgreSQL
-    participant Interno as Atualização do livro interno
+    participant Interno as Livro interno
     Cliente->>API: conta, valor e EndToEndId
     API->>Banco: trava a conta do cliente
     API->>Banco: EndToEndId já gravado?
     API->>Banco: confere saldo e limite do dia
     API->>Banco: grava cliente menos valor, WORLD mais valor
     Banco-->>API: confirmado
-    API->>Interno: evento depois da confirmação
+    API->>Interno: atualiza depois da confirmação
     Interno->>Banco: grava Pagamentos Instantâneos menos valor, WORLD mais valor
     API-->>Cliente: 201
 ```
 
-Recebimento. Simétrico, sem verificação de saldo. Pix de outras instituições chegariam por uma fila de eventos; no código, um endpoint faz esse papel e chama o mesmo caso de uso que o consumidor da fila chamaria.
+## Limite de Pix
 
-## Política de reabastecimento
+Para saber quanto um cliente pode "legitimamente" mandar, usei o limite diário. Segui a regra do Banco Central: diminuir o limite vale na hora; aumentar só vale depois de 24 horas, para proteger o cliente num golpe. Se o cliente pede um aumento e depois uma redução, a redução vale e o aumento é cancelado.
 
-O alvo de Pagamentos Instantâneos é a soma, para cada cliente, do menor entre o saldo e o que resta do limite do dia. Se a conta tiver pelo menos esse valor, nenhum Pix legítimo falha, mesmo que todos os clientes enviem tudo o que podem ao mesmo tempo.
+## Quanto deixar em Pagamentos Instantâneos
 
-Um job de reabastecimento roda a cada 5 minutos e compara o saldo de Pagamentos Instantâneos com o alvo. Diferenças até uma tolerância (R$ 100,00 por padrão) são ignoradas, para não gerar movimentos pequenos de ida e volta.
+Para cada cliente, vejo o máximo que ele ainda pode mandar hoje: o menor valor entre o saldo e o que sobra do limite. Somando todos os clientes, tenho o alvo. Se a conta tiver pelo menos isso, nenhum Pix falha, mesmo que todo mundo mande tudo ao mesmo tempo.
 
-Entre 8h e 18h, o job primeiro devolve à Reserva o que ela adiantou na noite anterior, usando Recursos de Clientes. Depois completa Pagamentos Instantâneos até o alvo, ou devolve o excedente para Recursos de Clientes. A devolução vem primeiro porque o adiantamento é só para a noite e a Reserva precisa estar cheia para cobrir a próxima.
+Exemplo: Ana tem 70 e limite 50, pode mandar 50. Bia tem 20 e limite 50, pode mandar 20. Caio tem 90, limite 50 e já mandou 40 hoje, pode mandar 10. O alvo é 80.
 
-Entre 18h e 8h, Recursos de Clientes está em custódia. Se faltar dinheiro, a Reserva adianta a diferença. Se sobrar, por Pix recebidos durante a noite, o excedente vai abatendo o adiantamento.
+Um job roda a cada 5 minutos. Se a conta estiver abaixo do alvo, completa com dinheiro de Recursos de Clientes. Se estiver acima, devolve a sobra. Diferenças pequenas (até R$ 100) são ignoradas, para não ficar mexendo o tempo todo.
 
-## Fechamento das 18h
+## O fechamento das 18h
 
-Às 18h, um job esvazia Pagamentos Instantâneos: o que ainda for adiantamento volta para a Reserva, e o resto, que é dinheiro de clientes, vai para Recursos de Clientes. Nesse momento Recursos de Clientes é igual ao total dos saldos dos clientes, que é o requisito 2. O resultado é gravado na tabela `closings`, uma linha por dia, com os dois valores e se eles bateram; a chave é o dia, então o fechamento não roda duas vezes. Em seguida a Reserva adianta o necessário para a noite.
+Às 18h, Recursos de Clientes precisa ter exatamente o total dos clientes. Como as duas contas juntas sempre dão esse total, Pagamentos Instantâneos fica zerada nesse momento.
+
+Mas o Pix funciona 24 horas. Se o dinheiro de Recursos de Clientes continuasse disponível depois das 18h, bastaria puxar de volta e a regra não serviria para nada. Por isso assumi que, às 18h, esse dinheiro vai para custódia (aplicado, por exemplo) e só volta às 8h. Os dois horários são configuráveis.
+
+Durante a noite, quem cobre Pagamentos Instantâneos é a Reserva Financeira. É um empréstimo: o dinheiro é da instituição, não dos clientes. Por isso, à noite a regra principal passa a descontar o que a Reserva emprestou. Não guardo esse valor à parte: o empréstimo é o capital da Reserva menos o saldo atual dela.
+
+Às 8h, o job primeiro devolve o empréstimo para a Reserva e só depois completa Pagamentos Instantâneos. A ordem importa: se completasse primeiro, poderia não sobrar dinheiro para devolver, e a Reserva não estaria cheia na noite seguinte.
+
+Cada fechamento fica gravado numa tabela, um registro por dia, com o total dos clientes, o valor de Recursos de Clientes e se os dois bateram.
 
 ## Operações internas
 
-As operações internas são dois jobs agendados (reabastecimento e fechamento) e três endpoints para o time interno:
+São dois jobs, o de reabastecimento e o de fechamento, que também podem ser chamados à mão. Para acompanhar, existe o `GET /internal/invariants`. Ele mostra os saldos das contas internas, o alvo, o empréstimo da Reserva e confere cinco coisas: cada livro soma zero, a regra principal, Pagamentos Instantâneos cobre o alvo e o empréstimo não é negativo. Cada item vem com uma frase explicando, e o resultado geral é OK ou ATTENTION.
 
-- `GET /internal/invariants` mostra os saldos das contas internas, o alvo, o adiantamento da Reserva e cinco verificações: cada livro soma zero, o invariante acima, Pagamentos Instantâneos cobre o alvo e o adiantamento não é negativo. Cada verificação vem com uma frase explicando o valor encontrado, e o status geral é OK ou ATTENTION. Funciona como painel e como fonte para alertas.
-- `POST /internal/rebalance` e `POST /internal/close-of-day` disparam os jobs à mão, para operação e testes.
+## Endpoints
 
-## Interfaces para clientes
+- `POST /customers`: abre uma conta.
+- `GET /customers/{id}/balance`: saldo.
+- `GET` e `PUT /customers/{id}/pix-limit`: consulta e altera o limite.
+- `POST /pix/transfers`: envia um Pix.
+- `POST /pix/incoming`: recebe um Pix (simula a fila).
+- `GET /internal/invariants`, `POST /internal/rebalance`, `POST /internal/close-of-day`: operações internas.
 
-- `POST /customers` abre uma conta, com o limite padrão de Pix.
-- `GET /customers/{id}/balance` devolve o saldo.
-- `GET /customers/{id}/pix-limit` e `PUT /customers/{id}/pix-limit` consultam e alteram o limite diário; um aumento fica com status `PENDING_INCREASE` e a data em que passa a valer.
-- `POST /pix/transfers` envia um Pix; `POST /pix/incoming` simula a fila de Pix recebidos.
-
-Erros seguem o formato de problem details (RFC 9457), com mensagem legível: saldo insuficiente e limite excedido voltam 422, conta inexistente 404 e requisição inválida 400. A documentação OpenAPI fica no Swagger e há arquivos `.http` com as requisições prontas.
+Os valores são em centavos. Os erros vêm em formato padrão (RFC 9457): saldo insuficiente ou limite estourado dão 422.
 
 ## Tecnologias
 
-Java 25 e Spring Boot 4, a stack em que trabalho, para concentrar o esforço no problema e não na ferramenta.
-
-PostgreSQL, porque o ledger depende de garantias que um banco relacional dá de forma nativa: gravar a transação e suas linhas juntas ou nenhuma, rejeitar chave de idempotência repetida com uma restrição única, travar uma linha enquanto um saldo é conferido e somar lançamentos por conta. As regras críticas também estão no banco como restrições (`CHECK`, `UNIQUE` e chaves estrangeiras), como segunda trava além do código.
-
-Flyway para versionar o esquema; o Hibernate apenas valida que as entidades batem com ele.
-
-Testcontainers nos testes de integração, para que concorrência e travas sejam testadas contra um Postgres real. Docker Compose para rodar localmente.
-
-As regras de negócio (soma zero, limite, alvo, horário de funcionamento) ficam em classes de domínio sem dependência de Spring ou banco, e são testadas isoladamente. Cada operação do sistema é um caso de uso próprio.
+- Java 25 e Spring Boot 4, que é a stack com que trabalho.
+- PostgreSQL, porque o ledger precisa gravar todas as linhas de uma operação juntas, recusar chave repetida e travar a conta enquanto confere o saldo. Isso um banco relacional faz bem. As regras mais importantes também estão no banco (nenhuma linha com valor zero, chave única, chaves estrangeiras).
+- Flyway para criar as tabelas.
+- Testcontainers para testar com um Postgres de verdade, principalmente a parte de concorrência.
 
 ## Testes
 
-Há testes unitários, que rodam só com Java, e testes de integração com Postgres real. Entre eles: dois Pix simultâneos com saldo para apenas um (um passa, o outro é recusado; sem a trava, o teste falha), reenvio do mesmo EndToEndId, limite com aumento pendente e um dia inteiro simulado (meio-dia, fechamento às 18h, Pix às 22h e reabastecimento às 8h do dia seguinte), conferindo o invariante em cada etapa.
+Há testes das regras sem banco e testes com banco real. Os principais: dois Pix ao mesmo tempo com saldo para um só (um passa e o outro é recusado; sem a trava, o teste falha), o mesmo Pix enviado duas vezes, o limite com aumento pendente e um dia inteiro simulado, do meio-dia até a manhã seguinte, conferindo a regra principal em cada etapa.
 
-## O que ficou fora e como evoluiria
+## O que ficou de fora
 
-Fila de eventos. Hoje a atualização do livro interno é um evento dentro da aplicação, disparado depois da confirmação. Se a aplicação parar entre as duas transações, o lado interno fica faltando até ser reprocessado; o painel de invariantes mostra essa diferença. Em produção, usaria o padrão outbox: o evento é gravado na mesma transação do lado do cliente e publicado depois em uma fila, com consumidor idempotente pela mesma chave. O recebimento de Pix de outras instituições usaria a mesma fila, chamando o caso de uso que já existe.
-
-Limite noturno. O Banco Central define um limite próprio entre 20h e 6h. Ele reduziria o alvo noturno e, com isso, o quanto a Reserva precisa adiantar.
-
-Conta de Pagamentos Instantâneos como ponto de contenção. Toda operação que mexe nela passa pela mesma trava, o que é simples e correto, mas limita a vazão em volume alto. A evolução seria dividir a conta em várias subcontas ou agrupar os lançamentos internos em lotes.
-
-Dias não úteis, autenticação dos endpoints internos e alertas automáticos a partir do status ATTENTION também ficaram fora.
+- Hoje a atualização do livro interno acontece dentro da aplicação. Se ela cair entre um passo e outro, o livro interno fica faltando até ser refeito (o `/internal/invariants` mostra a diferença). Em produção, eu gravaria o evento junto com a operação do cliente e publicaria numa fila depois (padrão outbox).
+- Limite noturno do Pix (20h às 6h), que diminuiria o quanto a Reserva precisa emprestar.
+- Toda operação na conta de Pagamentos Instantâneos passa pela mesma trava. Com muito volume isso vira gargalo, e seria preciso dividir a conta.
+- Fins de semana e feriados, autenticação dos endpoints internos e alertas automáticos.
