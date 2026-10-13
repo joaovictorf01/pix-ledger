@@ -1,5 +1,6 @@
 package dev.joaovictor.pixledger.application.pix;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -23,13 +24,15 @@ public class ReceivePixUseCase {
     private final LedgerService ledger;
     private final SystemAccounts systemAccounts;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     public ReceivePixUseCase(AccountRepository accounts, LedgerService ledger, SystemAccounts systemAccounts,
-            ApplicationEventPublisher events) {
+            ApplicationEventPublisher events, Clock clock) {
         this.accounts = accounts;
         this.ledger = ledger;
         this.systemAccounts = systemAccounts;
         this.events = events;
+        this.clock = clock;
     }
 
     @Transactional
@@ -49,7 +52,8 @@ public class ReceivePixUseCase {
         // receiving never makes a balance negative.
         LedgerTransaction transaction = LedgerTransaction.create(idempotencyKey, Ledger.CUSTOMER, List.of(
                 new Posting(systemAccounts.idOf(SystemAccount.CUSTOMER_WORLD), -command.amount()),
-                new Posting(command.customerAccountId(), command.amount())));
+                new Posting(command.customerAccountId(), command.amount())),
+                clock.instant());
         ledger.record(transaction);
 
         events.publishEvent(new PixSettledEvent(

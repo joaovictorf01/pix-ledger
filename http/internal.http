@@ -1,0 +1,13 @@
+@baseUrl = http://localhost:8080
+
+# Internal operations. The jobs run on their own (rebalance every 5 minutes,
+# closing at 18h Brasília); these requests trigger them by hand.
+
+### Invariants: balances, target and whether every rule holds now (status OK or ATTENTION)
+GET {{baseUrl}}/internal/invariants
+
+### Rebalance Instant Payments now
+POST {{baseUrl}}/internal/rebalance
+
+### Run today's closing now (once per day; a second call returns alreadyClosed = true)
+POST {{baseUrl}}/internal/close-of-day

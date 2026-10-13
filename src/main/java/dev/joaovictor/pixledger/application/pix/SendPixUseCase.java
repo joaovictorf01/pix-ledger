@@ -1,5 +1,6 @@
 package dev.joaovictor.pixledger.application.pix;
 
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 
@@ -28,15 +29,18 @@ public class SendPixUseCase {
     private final DailyPixLimitPolicy dailyLimit;
     private final SystemAccounts systemAccounts;
     private final ApplicationEventPublisher events;
+    private final Clock clock;
 
     public SendPixUseCase(AccountRepository accounts, LedgerEntryRepository entries, LedgerService ledger,
-            DailyPixLimitPolicy dailyLimit, SystemAccounts systemAccounts, ApplicationEventPublisher events) {
+            DailyPixLimitPolicy dailyLimit, SystemAccounts systemAccounts, ApplicationEventPublisher events,
+            Clock clock) {
         this.accounts = accounts;
         this.entries = entries;
         this.ledger = ledger;
         this.dailyLimit = dailyLimit;
         this.systemAccounts = systemAccounts;
         this.events = events;
+        this.clock = clock;
     }
 
     @Transactional
@@ -63,7 +67,8 @@ public class SendPixUseCase {
         // 4. Customer ledger: money leaves the customer and goes to the world.
         LedgerTransaction transaction = LedgerTransaction.create(idempotencyKey, Ledger.CUSTOMER, List.of(
                 new Posting(command.customerAccountId(), -command.amount()),
-                new Posting(systemAccounts.idOf(SystemAccount.CUSTOMER_WORLD), command.amount())));
+                new Posting(systemAccounts.idOf(SystemAccount.CUSTOMER_WORLD), command.amount())),
+                clock.instant());
         ledger.record(transaction);
 
         // 5. The internal ledger follows after this transaction commits.

@@ -3,6 +3,7 @@ package dev.joaovictor.pixledger.domain;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,8 @@ import dev.joaovictor.pixledger.domain.exception.InvalidTransactionException;
 
 class LedgerTransactionTest {
 
+    private static final Instant NOW = Instant.parse("2026-10-12T15:00:00Z");
+
     private final UUID customerFunds = UUID.randomUUID();
     private final UUID instantPayments = UUID.randomUUID();
 
@@ -19,7 +22,7 @@ class LedgerTransactionTest {
     void shouldCreateOneEntryPerPostingWhenBalanced() {
         LedgerTransaction transaction = LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
-                new Posting(instantPayments, 50)));
+                new Posting(instantPayments, 50)), NOW);
 
         assertThat(transaction.getEntries()).hasSize(2);
         assertThat(transaction.getEntries())
@@ -33,7 +36,7 @@ class LedgerTransactionTest {
     @Test
     void shouldRejectSinglePosting() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
-                new Posting(instantPayments, 50))))
+                new Posting(instantPayments, 50)), NOW))
                 .isInstanceOf(InvalidTransactionException.class)
                 .hasMessageContaining("at least 2");
     }
@@ -42,7 +45,7 @@ class LedgerTransactionTest {
     void shouldRejectPostingsThatDoNotAddUpToZero() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
-                new Posting(instantPayments, 40))))
+                new Posting(instantPayments, 40)), NOW))
                 .isInstanceOf(InvalidTransactionException.class)
                 .hasMessageContaining("got -10");
     }
@@ -51,7 +54,7 @@ class LedgerTransactionTest {
     void shouldRejectBlankIdempotencyKey() {
         assertThatThrownBy(() -> LedgerTransaction.create(" ", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, -50),
-                new Posting(instantPayments, 50))))
+                new Posting(instantPayments, 50)), NOW))
                 .isInstanceOf(InvalidTransactionException.class);
     }
 
@@ -59,7 +62,7 @@ class LedgerTransactionTest {
     void shouldRejectZeroAmountPosting() {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, 0),
-                new Posting(instantPayments, 0))))
+                new Posting(instantPayments, 0)), NOW))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -68,7 +71,7 @@ class LedgerTransactionTest {
         assertThatThrownBy(() -> LedgerTransaction.create("op-1", Ledger.INTERNAL, List.of(
                 new Posting(customerFunds, Long.MAX_VALUE),
                 new Posting(instantPayments, 1),
-                new Posting(customerFunds, Long.MIN_VALUE))))
+                new Posting(customerFunds, Long.MIN_VALUE)), NOW))
                 .isInstanceOf(InvalidTransactionException.class)
                 .hasMessageContaining("overflow");
     }

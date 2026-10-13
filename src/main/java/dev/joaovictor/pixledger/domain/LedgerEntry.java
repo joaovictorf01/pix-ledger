@@ -31,7 +31,7 @@ public class LedgerEntry {
     protected LedgerEntry() {
     }
 
-    public LedgerEntry(UUID transactionId, UUID accountId, Ledger ledger, long amount) {
+    public LedgerEntry(UUID transactionId, UUID accountId, Ledger ledger, long amount, Instant createdAt) {
         if (amount == 0) {
             throw new IllegalArgumentException("amount must not be zero");
         }
@@ -39,11 +39,12 @@ public class LedgerEntry {
         Objects.requireNonNull(transactionId, "transactionId must not be null");
         Objects.requireNonNull(accountId, "accountId must not be null");
         Objects.requireNonNull(ledger, "ledger must not be null");
+        Objects.requireNonNull(createdAt, "createdAt must not be null");
         this.id = UUID.randomUUID();
         this.transactionId = transactionId;
         this.accountId = accountId;
         this.ledger = ledger;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt;
         this.amount = amount;
     }
 

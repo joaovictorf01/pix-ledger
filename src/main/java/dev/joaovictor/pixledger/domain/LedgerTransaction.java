@@ -38,11 +38,11 @@ public class LedgerTransaction {
     protected LedgerTransaction() {
     }
 
-    private LedgerTransaction(String idempotencyKey, Ledger ledger) {
+    private LedgerTransaction(String idempotencyKey, Ledger ledger, Instant createdAt) {
         this.id = UUID.randomUUID();
         this.idempotencyKey = idempotencyKey;
         this.ledger = ledger;
-        this.createdAt = Instant.now();
+        this.createdAt = createdAt;
     }
 
     /**
@@ -50,12 +50,14 @@ public class LedgerTransaction {
      * same ledger, and the amounts must add up to zero: money only moves,
      * it is never created or destroyed.
      */
-    public static LedgerTransaction create(String idempotencyKey, Ledger ledger, List<Posting> postings) {
+    public static LedgerTransaction create(String idempotencyKey, Ledger ledger, List<Posting> postings,
+            Instant now) {
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new InvalidTransactionException("idempotencyKey must not be blank");
         }
         Objects.requireNonNull(ledger, "ledger must not be null");
         Objects.requireNonNull(postings, "postings must not be null");
+        Objects.requireNonNull(now, "now must not be null");
 
         if (postings.size() < MIN_POSTINGS) {
             throw new InvalidTransactionException(
@@ -74,9 +76,10 @@ public class LedgerTransaction {
             throw new InvalidTransactionException("postings must add up to zero, got " + sum);
         }
 
-        LedgerTransaction transaction = new LedgerTransaction(idempotencyKey, ledger);
+        LedgerTransaction transaction = new LedgerTransaction(idempotencyKey, ledger, now);
         transaction.entries = postings.stream()
-                .map(posting -> new LedgerEntry(transaction.id, posting.accountId(), ledger, posting.amount()))
+                .map(posting -> new LedgerEntry(transaction.id, posting.accountId(), ledger, posting.amount(),
+                        now))
                 .toList();
         return transaction;
     }
