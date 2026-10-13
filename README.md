@@ -2,6 +2,8 @@
 
 Double-entry ledger for Pix payments, built for the Cumbuca technical challenge.
 
+The design document, in Portuguese, is [ARQUITETURA.md](ARQUITETURA.md).
+
 ## Running
 
 Requires Docker. In the Codespace, Docker is already set up.
